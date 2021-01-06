@@ -1,0 +1,97 @@
+---
+title: "PML coursework"
+author: "Yangtaoyuan"
+date: "2020/12/19"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## Overview
+The report is wiritten for the Practical Machine Learning course on Coursera, the code is written in RStudio. The aim of report using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to  predict the manner in which they did the exercise.
+
+### Data 
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading Packages
+```{r}
+library(ggplot2)
+library(lattice)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(gbm)
+```
+
+## Loading the dowanloaded datasets resepectivly
+```{r}
+training_data <- read.csv('pml-training.csv', na.strings = c("NA", "#DIV/0!", ""))
+test_data <- read.csv('pml-testing.csv', na.strings = c("NA", "#DIV/0!", ""))
+```
+
+## cleaning Data
+### Removing the data which contains more than 95% NA and recording
+```{r}
+clnColumnIndex <- colSums(is.na(training_data))/nrow(training_data) < 0.95
+clean_training_data <- training_data[,clnColumnIndex]
+```
+```{r}
+colSums(is.na(clean_training_data))/nrow(clean_training_data)
+```
+### Verifying the removing data correctly
+```{r}
+colSums(is.na(clean_training_data))
+```
+### Removing col1 to col7 becasue they are not related to the model
+```{r}
+clean_training_data <- clean_training_data[,-c(1:7)]
+clean_test_data <- test_data[,-c(1:7)]
+```
+### Dividing the training data into  training set and cross validation set.
+```{r}
+inTrainIndex <- createDataPartition(clean_training_data$classe, p=0.75)[[1]]
+training_training_data <- clean_training_data[inTrainIndex,]
+training_crossval_data <- clean_training_data[-inTrainIndex,]
+```
+### the test data do same process as the traning data
+```{r}
+allNames <- names(clean_training_data)
+clean_test_data <- test_data[,allNames[1:52]]
+```
+## ML Algorithm - Decision Tree
+```{r}
+decisionTreeMod <- train(classe ~., method='rpart', data=training_training_data)
+```
+### predict with decision tree,however the result seems not good.
+```{r}
+decisionTreePrediction <- predict(decisionTreeMod, training_crossval_data)
+confusionMatrix(as.factor(training_crossval_data$classe), decisionTreePrediction)
+```
+### ploting the descision tree
+```{r}
+rpart.plot(decisionTreeMod$finalModel)
+```
+## ML Algorithm - Random forest 
+```{r}
+rfMod <- train(classe ~., method='rf', data=training_training_data, ntree=128)
+rfPrediction <- predict(rfMod, training_crossval_data)
+confusionMatrix(as.factor(training_crossval_data$classe), rfPrediction)
+```
+## Prediction
+Predict on the test set
+```{r}
+predict(rfMod, clean_test_data)
+```
+In conclusion, the random forest algorithm model(about 99%) has higher accuracy than decision tree model(about 50%), because the random forest is the ensemble algorithm. 
